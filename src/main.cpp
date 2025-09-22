@@ -1,12 +1,17 @@
 #include <mariadb/conncpp.hpp>
 #include <tgbot/tgbot.h>
+#include <map>
 
 using namespace std;
 using namespace TgBot;
 using namespace sql;
 
+//a label of idle instead of deletion will be relevant on a long-term work
+enum class UserState { Idle, Word };
+
 const int to_delete = 3;
 unique_ptr<Connection> conn;
+unordered_map<int64_t, UserState> userStates;
 
 vector<string> getTextArguments(string text) {
   stringstream s(text);
@@ -60,20 +65,35 @@ int main() {
   }
 
   bot.getEvents().onCommand("word", [&bot](Message::Ptr message) {
+    userStates[message->chat->id] = UserState::Word;
     bot.getApi().sendMessage(
         message->chat->id,
         "Добавление слова. Пожалуйста, введите слово и его перевод.");
   });
   bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
-    vector<string> result = getTextArguments(message->text);
-    if (result.size() != 2) {
+    int64_t user = message->chat->id;
+    if (userStates.find(user) == userStates.end()) {
       return;
     }
-    if (!existsWord(result[0])) {
-      addWord(result[0], result[1], to_delete);
-      bot.getApi().sendMessage(message->chat->id, "Слово добавлено.");
-    } else {
-      bot.getApi().sendMessage(message->chat->id, "Слово уже существует!");
+    UserState userState = userStates[user];
+    switch (userState) {
+    case UserState::Idle:
+      //bye warning
+      break;
+    case UserState::Word:
+      vector<string> result = getTextArguments(message->text);
+      //todo: add argument filtering
+      if (result.size() != 2) {
+        return;
+      }
+      if (!existsWord(result[0])) {
+        addWord(result[0], result[1], to_delete);
+        bot.getApi().sendMessage(user, "Слово добавлено.");
+      } else {
+        bot.getApi().sendMessage(user, "Слово уже существует!");
+      }
+      userStates[user] = UserState::Idle;
+      break;
     }
   });
 
