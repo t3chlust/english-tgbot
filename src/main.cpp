@@ -1,6 +1,6 @@
 #include <mariadb/conncpp.hpp>
 #include <tgbot/tgbot.h>
-#include <map>
+#include <thread>
 
 using namespace std;
 using namespace TgBot;
@@ -13,6 +13,9 @@ const int to_delete = 3;
 unique_ptr<Connection> conn;
 unordered_map<int64_t, UserState> userStates;
 
+string token = getenv("TOKEN");
+Bot bot(token);
+
 vector<string> getTextArguments(string text) {
   stringstream s(text);
   string t;
@@ -23,14 +26,14 @@ vector<string> getTextArguments(string text) {
   return result;
 }
 
-void addWord(SQLString word,
-             SQLString translation, int to_delete) {
+void addWord(int chat_id, SQLString word, SQLString translation,
+             int to_delete) {
   shared_ptr<PreparedStatement> stmnt(
-      conn->prepareStatement("INSERT INTO test.Word (word, translation, "
-                             "to_delete) VALUES (?, ?, ?)"));
-  stmnt->setString(1, word);
-  stmnt->setString(2, translation);
-  stmnt->setInt(3, to_delete);
+      conn->prepareStatement("INSERT INTO test.Word VALUES (?, ?, ?, ?)"));
+  stmnt->setInt(1, chat_id);
+  stmnt->setString(2, word);
+  stmnt->setString(3, translation);
+  stmnt->setInt(4, to_delete);
   stmnt->executeUpdate();
 }
 
@@ -43,10 +46,27 @@ bool existsWord(SQLString word) {
   return res->getBoolean("word_exists");
 }
 
-int main() {
-  string token = getenv("TOKEN");
-  Bot bot(token);
+unordered_map<int64_t, string> getActualWords() {
+  shared_ptr<Statement> stmnt(conn->createStatement());
+  unique_ptr<ResultSet> res(stmnt->executeQuery("SELECT chat_id, MAX(to_delete), word FROM test.Word GROUP BY chat_id"));
+  unordered_map<int64_t, string> result;
+  while (res->next()) {
+    result[res->getInt("chat_id")] = res->getString("word");
+  }
+  return result;
+}
 
+void notifyTranslate() {
+  while (true) {
+    this_thread::sleep_for(chrono::hours(3));
+    unordered_map<int64_t, string> words = getActualWords();
+    for (const auto& [chat_id, word] : words) {
+        bot.getApi().sendMessage(chat_id, word);
+    }
+  }
+}
+
+int main() {
   vector<BotCommand::Ptr> commands;
   BotCommand::Ptr cmdArray(new BotCommand);
   cmdArray->command = "word";
@@ -64,13 +84,13 @@ int main() {
     exit(0);
   }
 
-  bot.getEvents().onCommand("word", [&bot](Message::Ptr message) {
+  bot.getEvents().onCommand("word", [](Message::Ptr message) {
     userStates[message->chat->id] = UserState::Word;
     bot.getApi().sendMessage(
         message->chat->id,
         "Добавление слова. Пожалуйста, введите слово и его перевод.");
   });
-  bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
+  bot.getEvents().onAnyMessage([](Message::Ptr message) {
     int64_t user = message->chat->id;
     if (userStates.find(user) == userStates.end()) {
       return;
@@ -78,16 +98,14 @@ int main() {
     UserState userState = userStates[user];
     switch (userState) {
     case UserState::Idle:
-      //bye warning
       break;
     case UserState::Word:
       vector<string> result = getTextArguments(message->text);
-      //todo: add argument filtering
-      if (result.size() != 2) {
+      if (result.size() < 2) {
         return;
       }
       if (!existsWord(result[0])) {
-        addWord(result[0], result[1], to_delete);
+        addWord(message->chat->id, result[0], result[1], to_delete);
         bot.getApi().sendMessage(user, "Слово добавлено.");
       } else {
         bot.getApi().sendMessage(user, "Слово уже существует!");
@@ -101,6 +119,9 @@ int main() {
     printf("Bot username: %s\n", bot.getApi().getMe()->username.c_str());
     bot.getApi().deleteWebhook();
 
+    thread th1(notifyTranslate);
+    th1.detach();
+
     TgLongPoll longPoll(bot);
     while (true) {
       printf("Long poll started\n");
@@ -110,3 +131,4 @@ int main() {
     printf("error: %s\n", e.what());
   }
 }
+
