@@ -6,15 +6,13 @@ using namespace std;
 using namespace TgBot;
 using namespace sql;
 
-//a label of idle instead of deletion will be relevant on a long-term work
 enum class UserState { Idle, Word };
 
 const int to_delete = 3;
 unique_ptr<Connection> conn;
 unordered_map<int64_t, UserState> userStates;
 
-string token = getenv("TOKEN");
-Bot bot(token);
+Bot bot(getenv("TOKEN"));
 
 vector<string> getTextArguments(string text) {
   stringstream s(text);
@@ -26,11 +24,11 @@ vector<string> getTextArguments(string text) {
   return result;
 }
 
-void addWord(int chat_id, SQLString word, SQLString translation,
+void addWord(int64_t chat_id, SQLString word, SQLString translation,
              int to_delete) {
   shared_ptr<PreparedStatement> stmnt(
       conn->prepareStatement("INSERT INTO test.Word VALUES (?, ?, ?, ?)"));
-  stmnt->setInt(1, chat_id);
+  stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
   stmnt->setString(3, translation);
   stmnt->setInt(4, to_delete);
@@ -42,26 +40,30 @@ bool existsWord(SQLString word) {
       "SELECT EXISTS (SELECT * FROM test.Word WHERE word = ?) as word_exists"));
   stmnt->setString(1, word);
   unique_ptr<ResultSet> res(stmnt->executeQuery());
-  res->next();
-  return res->getBoolean("word_exists");
+  while (res->next()) {
+      return res->getBoolean("word_exists");
+  }
+  return false;
 }
 
 unordered_map<int64_t, string> getActualWords() {
   shared_ptr<Statement> stmnt(conn->createStatement());
-  unique_ptr<ResultSet> res(stmnt->executeQuery("SELECT chat_id, MAX(to_delete), word FROM test.Word GROUP BY chat_id"));
+  unique_ptr<ResultSet> res(stmnt->executeQuery(
+      "SELECT chat_id, MAX(to_delete), word FROM test.Word GROUP BY chat_id"));
   unordered_map<int64_t, string> result;
   while (res->next()) {
-    result[res->getInt("chat_id")] = res->getString("word");
+    result[res->getInt64("chat_id")] = res->getString("word");
   }
   return result;
 }
 
 void notifyTranslate() {
   while (true) {
-    this_thread::sleep_for(chrono::hours(3));
+    this_thread::sleep_for(chrono::seconds(1));
     unordered_map<int64_t, string> words = getActualWords();
     for (const auto& [chat_id, word] : words) {
-        bot.getApi().sendMessage(chat_id, word);
+      bot.getApi().sendMessage(chat_id, word);
+      //todo: decrement to_delete count in word record
     }
   }
 }
@@ -76,7 +78,7 @@ int main() {
   bot.getApi().setMyCommands(commands);
 
   Driver *driver = mariadb::get_driver_instance();
-  SQLString url("jdbc:mariadb://localhost:3306/echobot_db");
+ SQLString url("jdbc:mariadb://localhost:3306/echobot_db");
   Properties properties({{"user", "echobot"}, {"password", "strong_password"}});
   conn = unique_ptr<Connection>(driver->connect(url, properties));
   if (!conn) {
@@ -104,6 +106,7 @@ int main() {
       if (result.size() < 2) {
         return;
       }
+      //todo: filter arguments
       if (!existsWord(result[0])) {
         addWord(message->chat->id, result[0], result[1], to_delete);
         bot.getApi().sendMessage(user, "Слово добавлено.");
@@ -131,4 +134,3 @@ int main() {
     printf("error: %s\n", e.what());
   }
 }
-
