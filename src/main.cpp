@@ -35,6 +35,34 @@ void addWord(int64_t chat_id, SQLString word, SQLString translation,
   stmnt->executeUpdate();
 }
 
+int getWordDeletionCount(int64_t chat_id, SQLString word) {
+  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+      "SELECT to_delete FROM test.Word WHERE chat_id = ? AND word = ?"));
+  stmnt->setInt64(1, chat_id);
+  stmnt->setString(2, word);
+  unique_ptr<ResultSet> res(stmnt->executeQuery());
+  while (res->next()) {
+      return res->getInt("to_delete");
+  }
+  return -1;
+}
+
+void incrementWordDeletionCount(int64_t chat_id, SQLString word) {
+  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+      "UPDATE test.Word SET to_delete = to_delete - 1 WHERE chat_id = ? AND word = ?"));
+  stmnt->setInt64(1, chat_id);
+  stmnt->setString(2, word);
+  stmnt->executeQuery();
+}
+
+void deleteWord(int64_t chat_id, SQLString word) {
+  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+      "DELETE FROM test.Word WHERE chat_id = ? AND word = ?"));
+  stmnt->setInt64(1, chat_id);
+  stmnt->setString(2, word);
+  stmnt->executeUpdate();
+}
+
 bool existsWord(SQLString word) {
   shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
       "SELECT EXISTS (SELECT * FROM test.Word WHERE word = ?) as word_exists"));
@@ -59,11 +87,15 @@ unordered_map<int64_t, string> getActualWords() {
 
 void notifyTranslate() {
   while (true) {
-    this_thread::sleep_for(chrono::seconds(1));
+    this_thread::sleep_for(chrono::hours(2));
     unordered_map<int64_t, string> words = getActualWords();
     for (const auto& [chat_id, word] : words) {
-      bot.getApi().sendMessage(chat_id, word);
-      //todo: decrement to_delete count in word record
+      bot.getApi().sendMessage(chat_id, "Переведите слово: " + word);
+      if (getWordDeletionCount(chat_id, word) <= 1) {
+          deleteWord(chat_id, word);
+      } else {
+          incrementWordDeletionCount(chat_id, word);
+      }
     }
   }
 }
