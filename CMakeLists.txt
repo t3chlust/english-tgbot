@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.1.1)
-project(echobot)
+project(english-tgbot)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,7 @@ if (CURL_FOUND)
     add_definitions(-DHAVE_CURL)
 endif()
 
-add_executable(echobot src/main.cpp)
+file(GLOB SOURCES "src/*.cpp")
+add_executable(english-tgbot ${SOURCES})
 
-target_link_libraries(echobot TgBot /usr/local/lib/mariadb/libmariadbcpp.so ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES})
+target_link_libraries(english-tgbot TgBot /usr/local/lib/mariadb/libmariadbcpp.so ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES})
