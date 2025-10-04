@@ -27,6 +27,8 @@ void notifyTranslate() {
       if (db.getWordDeletionCount(chat_id, word) <= 1) {
         db.deleteWord(chat_id, word);
       } else {
+        //todo: add transaction
+        db.updateLastSend(chat_id, word, getDateTime());
         db.incrementWordDeletionCount(chat_id, word);
       }
     }

@@ -13,12 +13,15 @@ class Database {
         unique_ptr<Connection> conn;
     public:
       Database();
+
       void addWord(int64_t chat_id, SQLString word, SQLString translation,
                    int to_delete);
 
       int getWordDeletionCount(int64_t chat_id, SQLString word);
 
       void incrementWordDeletionCount(int64_t chat_id, SQLString word);
+
+      void updateLastSend(int64_t chat_id, SQLString word, SQLString datetime);
 
       void deleteWord(int64_t chat_id, SQLString word);
 

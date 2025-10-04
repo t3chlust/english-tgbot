@@ -21,7 +21,8 @@ Database::Database() {
 void Database::addWord(int64_t chat_id, SQLString word, SQLString translation,
                        int to_delete) {
   shared_ptr<PreparedStatement> stmnt(
-      conn->prepareStatement("INSERT INTO test.Word VALUES (?, ?, ?, ?)"));
+      conn->prepareStatement("INSERT INTO test.Word (chat_id, word, "
+                             "translation, to_delete) VALUES (?, ?, ?, ?)"));
   stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
   stmnt->setString(3, translation);
@@ -47,6 +48,15 @@ void Database::incrementWordDeletionCount(int64_t chat_id, SQLString word) {
                              "- 1 WHERE chat_id = ? AND word = ?"));
   stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
+  stmnt->executeQuery();
+}
+
+void Database::updateLastSend(int64_t chat_id, SQLString word, SQLString datetime) {
+  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+      "UPDATE test.Word SET last_send = ? where chat_id = ? and word = ?"));
+  stmnt->setDateTime(1, datetime);
+  stmnt->setInt64(2, chat_id);
+  stmnt->setString(3, word);
   stmnt->executeQuery();
 }
 
