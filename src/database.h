@@ -1,29 +1,27 @@
-// database.h
-#ifndef database_h
-#define database_h
+#ifndef DATABASE_H
+#define DATABASE_H
 
 #include <mariadb/conncpp.hpp>
 #include <unordered_map>
 
-using namespace std;
-using namespace sql;
-
 class Database {
     private:
-        unique_ptr<Connection> conn;
+        std::unique_ptr<sql::Connection> conn;
     public:
       Database();
-      void addWord(int64_t chat_id, SQLString word, SQLString translation,
+
+      void addWord(int64_t chat_id, sql::SQLString word, sql::SQLString translation,
                    int to_delete);
 
-      int getWordDeletionCount(int64_t chat_id, SQLString word);
+      int getWordDeletionCount(int64_t chat_id, sql::SQLString word);
 
-      void incrementWordDeletionCount(int64_t chat_id, SQLString word);
+      void incrementWordDeletionCount(int64_t chat_id, sql::SQLString word);
 
-      void deleteWord(int64_t chat_id, SQLString word);
+      void deleteWord(int64_t chat_id, sql::SQLString word);
 
-      bool existsWord(SQLString word);
+      bool existsWord(sql::SQLString word);
 
-      unordered_map<int64_t, string> getActualWords();
+      std::unordered_map<int64_t, std::string> getActualWords();
 };
-#endif //database.h
+
+#endif //DATABASE_H

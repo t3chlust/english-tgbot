@@ -1,5 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
+
 #include <sstream>
 #include <string>
 #include <vector>
@@ -13,4 +14,5 @@ inline std::vector<std::string> getTextArguments(std::string text) {
   }
   return result;
 }
-#endif
+
+#endif //UTILS_H

@@ -3,24 +3,21 @@
 
 #include "database.h"
 
-using namespace std;
-using namespace TgBot;
-using namespace sql;
-
 Database::Database() {
-  Driver *driver = mariadb::get_driver_instance();
-  SQLString url("jdbc:mariadb://localhost:3306/echobot_db");
-  Properties properties({{"user", "echobot"}, {"password", "strong_password"}});
-  conn = unique_ptr<Connection>(driver->connect(url, properties));
+  sql::Driver *driver = sql::mariadb::get_driver_instance();
+  sql::SQLString url("jdbc:mariadb://localhost:3306/echobot_db");
+  sql::Properties properties(
+      {{"user", "echobot"}, {"password", "strong_password"}});
+  conn = std::unique_ptr<sql::Connection>(driver->connect(url, properties));
   if (!conn) {
     printf("Invalid database connection\n");
     exit(0);
   }
 }
 
-void Database::addWord(int64_t chat_id, SQLString word, SQLString translation,
-                       int to_delete) {
-  shared_ptr<PreparedStatement> stmnt(
+void Database::addWord(int64_t chat_id, sql::SQLString word,
+                       sql::SQLString translation, int to_delete) {
+  std::shared_ptr<sql::PreparedStatement> stmnt(
       conn->prepareStatement("INSERT INTO test.Word VALUES (?, ?, ?, ?)"));
   stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
@@ -29,20 +26,21 @@ void Database::addWord(int64_t chat_id, SQLString word, SQLString translation,
   stmnt->executeUpdate();
 }
 
-int Database::getWordDeletionCount(int64_t chat_id, SQLString word) {
-  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+int Database::getWordDeletionCount(int64_t chat_id, sql::SQLString word) {
+  std::shared_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement(
       "SELECT to_delete FROM test.Word WHERE chat_id = ? AND word = ?"));
   stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
-  unique_ptr<ResultSet> res(stmnt->executeQuery());
+  std::unique_ptr<sql::ResultSet> res(stmnt->executeQuery());
   while (res->next()) {
     return res->getInt("to_delete");
   }
   return -1;
 }
 
-void Database::incrementWordDeletionCount(int64_t chat_id, SQLString word) {
-  shared_ptr<PreparedStatement> stmnt(
+void Database::incrementWordDeletionCount(int64_t chat_id,
+                                          sql::SQLString word) {
+  std::shared_ptr<sql::PreparedStatement> stmnt(
       conn->prepareStatement("UPDATE test.Word SET to_delete = to_delete "
                              "- 1 WHERE chat_id = ? AND word = ?"));
   stmnt->setInt64(1, chat_id);
@@ -50,32 +48,32 @@ void Database::incrementWordDeletionCount(int64_t chat_id, SQLString word) {
   stmnt->executeQuery();
 }
 
-void Database::deleteWord(int64_t chat_id, SQLString word) {
-  shared_ptr<PreparedStatement> stmnt(conn->prepareStatement(
+void Database::deleteWord(int64_t chat_id, sql::SQLString word) {
+  std::shared_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement(
       "DELETE FROM test.Word WHERE chat_id = ? AND word = ?"));
   stmnt->setInt64(1, chat_id);
   stmnt->setString(2, word);
   stmnt->executeUpdate();
 }
 
-bool Database::existsWord(SQLString word) {
-  shared_ptr<PreparedStatement> stmnt(
+bool Database::existsWord(sql::SQLString word) {
+  std::shared_ptr<sql::PreparedStatement> stmnt(
       conn->prepareStatement("SELECT EXISTS (SELECT * FROM test.Word "
                              "WHERE word = ?) as word_exists"));
   stmnt->setString(1, word);
-  unique_ptr<ResultSet> res(stmnt->executeQuery());
+  std::unique_ptr<sql::ResultSet> res(stmnt->executeQuery());
   while (res->next()) {
     return res->getBoolean("word_exists");
   }
   return false;
 }
 
-unordered_map<int64_t, string> Database::getActualWords() {
-  shared_ptr<Statement> stmnt(conn->createStatement());
-  unique_ptr<ResultSet> res(
-      stmnt->executeQuery("SELECT chat_id, MAX(to_delete), word FROM "
-                          "test.Word GROUP BY chat_id"));
-  unordered_map<int64_t, string> result;
+std::unordered_map<int64_t, std::string> Database::getActualWords() {
+  std::shared_ptr<sql::Statement> stmnt(conn->createStatement());
+  std::unique_ptr<sql::ResultSet> res(
+      stmnt->executeQuery("SELECT chat_id, word, to_delete FROM "
+                          "test.Word ORDER BY to_delete DESC LIMIT 1"));
+  std::unordered_map<int64_t, std::string> result;
   while (res->next()) {
     result[res->getInt64("chat_id")] = res->getString("word");
   }
