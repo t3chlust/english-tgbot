@@ -15,4 +15,10 @@ inline std::vector<std::string> getTextArguments(std::string text) {
   return result;
 }
 
-#endif //UTILS_H
+struct Word {
+  int64_t chat_id;
+  std::string word;
+  std::string translation;
+  short to_delete;
+};
+#endif // UTILS_H

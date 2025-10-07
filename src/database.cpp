@@ -1,6 +1,7 @@
 #include <mariadb/conncpp.hpp>
 #include <tgbot/tgbot.h>
 
+#include "utils.h"
 #include "database.h"
 
 Database::Database() {
@@ -68,14 +69,15 @@ bool Database::existsWord(sql::SQLString word) {
   return false;
 }
 
-std::unordered_map<int64_t, std::string> Database::getActualWords() {
+std::vector<Word> Database::getActualWords() {
   std::shared_ptr<sql::Statement> stmnt(conn->createStatement());
-  std::unique_ptr<sql::ResultSet> res(
-      stmnt->executeQuery("SELECT chat_id, word, to_delete FROM "
-                          "test.Word ORDER BY to_delete DESC LIMIT 1"));
-  std::unordered_map<int64_t, std::string> result;
+  std::unique_ptr<sql::ResultSet> res(stmnt->executeQuery(
+      "SELECT * FROM test.Word ORDER BY to_delete DESC LIMIT 1"));
+  std::vector<Word> result;
   while (res->next()) {
-    result[res->getInt64("chat_id")] = res->getString("word");
+    result.push_back(Word{
+        res->getInt64("chat_id"), res->getString("word").c_str(),
+        res->getString("translation").c_str(), res->getShort("to_delete")});
   }
   return result;
 }

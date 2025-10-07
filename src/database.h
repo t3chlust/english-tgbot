@@ -4,6 +4,8 @@
 #include <mariadb/conncpp.hpp>
 #include <unordered_map>
 
+#include "utils.h"
+
 class Database {
     private:
         std::unique_ptr<sql::Connection> conn;
@@ -21,7 +23,7 @@ class Database {
 
       bool existsWord(sql::SQLString word);
 
-      std::unordered_map<int64_t, std::string> getActualWords();
+	  std::vector<Word> getActualWords();
 };
 
 #endif //DATABASE_H

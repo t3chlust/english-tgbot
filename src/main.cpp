@@ -1,7 +1,7 @@
+#include <thread>
+
 #include <mariadb/conncpp.hpp>
 #include <tgbot/tgbot.h>
-
-#include <thread>
 
 #include "database.h"
 #include "utils.h"
@@ -18,13 +18,17 @@ TgBot::Bot bot(getenv("TOKEN"));
 void notifyTranslate() {
   while (true) {
     std::this_thread::sleep_for(std::chrono::seconds(5));
-    std::unordered_map<int64_t, std::string> words = db.getActualWords();
-    for (const auto &[chat_id, word] : words) {
-      bot.getApi().sendMessage(chat_id, "Переведите слово: " + word);
-      if (db.getWordDeletionCount(chat_id, word) <= 1) {
-        db.deleteWord(chat_id, word);
+    std::vector<Word> words = db.getActualWords();
+    for (const auto &word : words) {
+      bot.getApi().sendMessage(word.chat_id,
+                               "Переведите слово: " + word.word + "\n" +
+                                   "Посмотреть перевод: ||" + word.translation +
+                                   "||",
+                               nullptr, nullptr, nullptr, "MarkdownV2");
+      if (db.getWordDeletionCount(word.chat_id, word.word) <= 1) {
+        db.deleteWord(word.chat_id, word.word);
       } else {
-        db.incrementWordDeletionCount(chat_id, word);
+        db.incrementWordDeletionCount(word.chat_id, word.word);
       }
     }
   }
@@ -59,7 +63,6 @@ int main() {
       if (result.size() < 2) {
         return;
       }
-      // todo: filter arguments
       if (!db.existsWord(result[0])) {
         db.addWord(message->chat->id, result[0], result[1], to_delete);
         bot.getApi().sendMessage(user, "Слово добавлено.");
